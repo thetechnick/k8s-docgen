@@ -118,6 +118,7 @@ type CustomResourceSubObject struct {
 	EmbeddedSubObjects []string
 	IsEmbedded         bool
 	Link               string
+	Parents            []string
 }
 
 type DocumentationBlock struct {
@@ -199,7 +200,7 @@ func APIGroupFromDocPackage(pkg *doc.Package) (*APIGroup, error) {
 		apiGroup.SubObjects = append(apiGroup.SubObjects, subObjects[t.Name])
 	}
 
-	// Handle embedded fields.
+	// Handle embedded fields and parents.
 	for i, subObject := range apiGroup.SubObjects {
 		if _, ok := subObjectMap[subObject.Name]; ok {
 			apiGroup.SubObjects[i].IsEmbedded = true
@@ -210,6 +211,24 @@ func APIGroupFromDocPackage(pkg *doc.Package) (*APIGroup, error) {
 			apiGroup.SubObjects[i].Fields = append(
 				apiGroup.SubObjects[i].Fields, embeddedObj.Fields...)
 		}
+	}
+
+	// Add Parents
+	objectsUsingType := map[string][]string{}
+	for _, subObject := range apiGroup.SubObjects {
+		for _, field := range subObject.Fields {
+			k := strings.TrimLeft(field.Type, "[]")
+			objectsUsingType[k] = append(objectsUsingType[k], subObject.Name)
+		}
+	}
+	for _, cr := range apiGroup.CRs {
+		for _, field := range cr.Fields {
+			k := strings.TrimLeft(field.Type, "[]")
+			objectsUsingType[k] = append(objectsUsingType[k], cr.Kind)
+		}
+	}
+	for i := range apiGroup.SubObjects {
+		apiGroup.SubObjects[i].Parents = objectsUsingType[apiGroup.SubObjects[i].Name]
 	}
 
 	// Add Examples

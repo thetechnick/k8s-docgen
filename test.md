@@ -123,6 +123,10 @@ ClusterObjectSetSpec defines the desired state of a ClusterObjectSet.
 | `availabilityProbes` <b>required</b><br><a href="#objectsetprobe">[]ObjectSetProbe</a> | Availability Probes check objects that are part of the package.<br>All probes need to succeed for a package to be considered Available.<br>Failing probes will prevent the reconciliation of objects in later phases. |
 
 
+Used in:
+* [ClusterObjectSet](#clusterobjectset)
+
+
 ### ClusterObjectSetStatus
 
 ClusterObjectSetStatus defines the observed state of a ClusterObjectSet.
@@ -134,6 +138,10 @@ ClusterObjectSetStatus defines the observed state of a ClusterObjectSet.
 | `pausedFor` <br><a href="#objectsetpausedobject">[]ObjectSetPausedObject</a> | List of objects, the controller has paused reconciliation on. |
 
 
+Used in:
+* [ClusterObjectSet](#clusterobjectset)
+
+
 ### ObjectSetObject
 
 An object that is part of the phase of an ObjectSet.
@@ -141,6 +149,10 @@ An object that is part of the phase of an ObjectSet.
 | Field | Description |
 | ----- | ----------- |
 | `object` <b>required</b><br>runtime.RawExtension |  |
+
+
+Used in:
+* [ObjectSetTemplatePhase](#objectsettemplatephase)
 
 
 ### ObjectSetPausedObject
@@ -154,6 +166,13 @@ Specifies that the reconciliation of a specific object should be paused.
 | `name` <b>required</b><br><a href="#string">string</a> | Object Name. |
 
 
+Used in:
+* [ClusterObjectSetSpec](#clusterobjectsetspec)
+* [ClusterObjectSetStatus](#clusterobjectsetstatus)
+* [ObjectSetSpec](#objectsetspec)
+* [ObjectSetStatus](#objectsetstatus)
+
+
 ### ObjectSetProbe
 
 ObjectSetProbe define how ObjectSets check their children for their status.
@@ -162,6 +181,12 @@ ObjectSetProbe define how ObjectSets check their children for their status.
 | ----- | ----------- |
 | `probes` <b>required</b><br><a href="#probe">[]Probe</a> | Probe configuration parameters. |
 | `selector` <b>required</b><br><a href="#probeselector">ProbeSelector</a> | Selector specifies which objects this probe should target. |
+
+
+Used in:
+* [ClusterObjectSetSpec](#clusterobjectsetspec)
+* [ObjectSetSpec](#objectsetspec)
+* [ObjectSetTemplateSpec](#objectsettemplatespec)
 
 
 ### ObjectSetSpec
@@ -176,6 +201,10 @@ ObjectSetSpec defines the desired state of a ObjectSet.
 | `availabilityProbes` <b>required</b><br><a href="#objectsetprobe">[]ObjectSetProbe</a> | Availability Probes check objects that are part of the package.<br>All probes need to succeed for a package to be considered Available.<br>Failing probes will prevent the reconciliation of objects in later phases. |
 
 
+Used in:
+* [ObjectSet](#objectset)
+
+
 ### ObjectSetStatus
 
 ObjectSetStatus defines the observed state of a ObjectSet.
@@ -185,6 +214,10 @@ ObjectSetStatus defines the observed state of a ObjectSet.
 | `conditions` <br>[]metav1.Condition | Conditions is a list of status conditions ths object is in. |
 | `phase` <br><a href="#objectsetstatusphase">ObjectSetStatusPhase</a> | Deprecated: This field is not part of any API contract<br>it will go away as soon as kubectl can print conditions!<br>Human readable status - please use .Conditions from code |
 | `pausedFor` <br><a href="#objectsetpausedobject">[]ObjectSetPausedObject</a> | List of objects, the controller has paused reconciliation on. |
+
+
+Used in:
+* [ObjectSet](#objectset)
 
 
 ### ObjectSetTemplatePhase
@@ -197,6 +230,12 @@ ObjectSet reconcile phase.
 | `objects` <b>required</b><br><a href="#objectsetobject">[]ObjectSetObject</a> | Objects belonging to this phase. |
 
 
+Used in:
+* [ClusterObjectSetSpec](#clusterobjectsetspec)
+* [ObjectSetSpec](#objectsetspec)
+* [ObjectSetTemplateSpec](#objectsettemplatespec)
+
+
 ### ObjectSetTemplateSpec
 
 ObjectSet specification.
@@ -205,6 +244,9 @@ ObjectSet specification.
 | ----- | ----------- |
 | `phases` <b>required</b><br><a href="#objectsettemplatephase">[]ObjectSetTemplatePhase</a> | Reconcile phase configuration for a ObjectSet.<br>Phases will be reconciled in order and the contained objects checked<br>against given probes before continuing with the next phase. |
 | `availabilityProbes` <b>required</b><br><a href="#objectsetprobe">[]ObjectSetProbe</a> | Availability Probes check objects that are part of the package.<br>All probes need to succeed for a package to be considered Available.<br>Failing probes will prevent the reconciliation of objects in later phases. |
+
+
+Used in:
 
 
 ### PackageProbeKindSpec
@@ -217,6 +259,10 @@ Kind package probe parameters.
 | `kind` <b>required</b><br><a href="#string">string</a> | Object Kind to apply a probe to. |
 
 
+Used in:
+* [ProbeSelector](#probeselector)
+
+
 ### Probe
 
 Defines probe parameters to check parts of a package.
@@ -225,6 +271,10 @@ Defines probe parameters to check parts of a package.
 | ----- | ----------- |
 | `condition` <br><a href="#probeconditionspec">ProbeConditionSpec</a> |  |
 | `fieldsEqual` <br><a href="#probefieldsequalspec">ProbeFieldsEqualSpec</a> |  |
+
+
+Used in:
+* [ObjectSetProbe](#objectsetprobe)
 
 
 ### ProbeConditionSpec
@@ -237,6 +287,10 @@ Condition Probe parameters.
 | `status` <b>required</b><br><a href="#string">string</a> | Condition status to probe for. |
 
 
+Used in:
+* [Probe](#probe)
+
+
 ### ProbeFieldsEqualSpec
 
 Compares two fields specified by JSON Paths.
@@ -247,6 +301,10 @@ Compares two fields specified by JSON Paths.
 | `fieldB` <b>required</b><br><a href="#string">string</a> |  |
 
 
+Used in:
+* [Probe](#probe)
+
+
 ### ProbeSelector
 
 
@@ -254,3 +312,7 @@ Compares two fields specified by JSON Paths.
 | Field | Description |
 | ----- | ----------- |
 | `kind` <br><a href="#packageprobekindspec">PackageProbeKindSpec</a> | Kind specific configuration parameters. Only present if Type = Kind. |
+
+
+Used in:
+* [ObjectSetProbe](#objectsetprobe)

@@ -36,7 +36,13 @@
 {{.Doc.Sanitized}}
 
 {{template "fields" .}}
+
+Used in:
+{{range .Parents -}}
+* [{{.}}](#{{. | lower}})
 {{end}}
+{{end}}
+
 
 ## `{{.GroupVersion}}`
 
