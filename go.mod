@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/go-logr/logr v1.2.0
 	k8s.io/apimachinery v0.24.3
 	sigs.k8s.io/yaml v1.2.0
 )
