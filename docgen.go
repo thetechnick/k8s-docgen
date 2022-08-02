@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"flag"
+	"context"
 	"fmt"
 	"go/ast"
 	"go/doc"
@@ -23,43 +23,74 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func main() {
-	templateFile := flag.String("template", "", "Go template for the documentation.")
-	flag.Parse()
+type Docgen struct {
+	opts Options
+}
 
-	docPkg, err := ParseDocPackage(flag.Arg(0))
+type Options struct {
+	TemplateFile string
+}
+
+func (opts *Options) Default() {
+}
+
+type Option interface {
+	Apply(opts *Options)
+}
+
+type TemplateFile string
+
+func (f TemplateFile) Apply(opts *Options) {
+	opts.TemplateFile = string(f)
+}
+
+func NewDocgen(opts ...Option) *Docgen {
+	d := &Docgen{}
+	for _, opt := range opts {
+		opt.Apply(&d.opts)
+	}
+	d.opts.Default()
+	return d
+}
+
+func (d *Docgen) Parse(ctx context.Context, folder string, writer io.Writer) error {
+	docPkg, err := d.parseGoPackage(ctx, folder)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("parsing go package: %w", err)
 	}
 
-	apiGroup, err := APIGroupFromDocPackage(docPkg)
+	apiGroup, err := d.loadAPIGroup(ctx, docPkg)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("load API objects: %w", err)
 	}
 
 	t := template.New("doc").Funcs(sprig.TxtFuncMap())
-	if templateFile != nil && *templateFile != "" {
-		c, err := ioutil.ReadFile(*templateFile)
+	if d.opts.TemplateFile != "" {
+		c, err := ioutil.ReadFile(d.opts.TemplateFile)
 		if err != nil {
-			panic(fmt.Errorf("read file: %w", err))
+			return fmt.Errorf("reading template file: %w", err)
 		}
 
 		if t, err = t.Parse(string(c)); err != nil {
-			panic(err)
+			return fmt.Errorf("parsing template: %w", err)
 		}
 	} else {
 		// default template
-		panic("no template")
+		if t, err = t.Parse(defaultTemplate); err != nil {
+			return fmt.Errorf("parsing default template: %w", err)
+		}
 	}
 
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, apiGroup); err != nil {
-		panic(err)
+		return fmt.Errorf("executing template: %w", err)
 	}
-	fmt.Print(strings.TrimSpace(buf.String()))
+
+	fmt.Fprint(writer, strings.TrimSpace(buf.String()))
+	return nil
 }
 
-func ParseDocPackage(folder string) (*doc.Package, error) {
+func (d *Docgen) parseGoPackage(ctx context.Context, folder string) (*doc.Package, error) {
 	fileSet := token.NewFileSet()
 	files := map[string]*ast.File{}
 
@@ -82,67 +113,15 @@ func ParseDocPackage(folder string) (*doc.Package, error) {
 	}
 
 	// This will fail due to unresolved imports,
-	// but we don't care for just templating documentation.
+	// but we don't care for just generating documentation.
 	apkg, _ := ast.NewPackage(fileSet, files, nil, nil)
 	return doc.New(apkg, "", 0), nil
 }
 
-type APIGroup struct {
-	schema.GroupVersion
-	Doc        DocumentationBlock
-	CRs        []CustomResource
-	SubObjects []CustomResourceSubObject
-}
-
-// CustomResource
-type CustomResource struct {
-	schema.GroupVersionKind
-	Doc     DocumentationBlock
-	Example string
-	Link    string
-	Fields  []CustomResourceField
-}
-
-type CustomResourceField struct {
-	Name       string
-	Doc        DocumentationBlock
-	Type       string
-	IsRequired bool
-}
-
-type CustomResourceSubObject struct {
-	// Name of the go struct
-	Name               string
-	Doc                DocumentationBlock
-	Fields             []CustomResourceField
-	EmbeddedSubObjects []string
-	IsEmbedded         bool
-	Link               string
-	Parents            []string
-}
-
-type DocumentationBlock struct {
-	// Raw documentation as written in the file.
-	Raw string
-	// Sanitized documentation string, where TODO and
-	// code-generator comments are removed.
-	Sanitized string
-	// Codegen annotations, if present.
-	Annotations map[string]string
-}
-
-const (
-	groupNameAnnotation  = "groupName"
-	objectRootAnnotation = "kubebuilder:object:root"
-	scopeAnnotation      = "kubebuilder:resource:scope"
-	exampleAnnotation    = "example"
-	defaultAnnotation    = "kubebuilder:default"
-)
-
-func APIGroupFromDocPackage(pkg *doc.Package) (*APIGroup, error) {
+func (d *Docgen) loadAPIGroup(ctx context.Context, pkg *doc.Package) (*APIGroup, error) {
 	apiGroup := &APIGroup{}
 
-	pkgDoc, err := FormatRawDoc(pkg.Doc)
+	pkgDoc, err := d.formatRawDoc(ctx, pkg.Doc)
 	if err != nil {
 		return nil, fmt.Errorf("formatting package documentation: %w", err)
 	}
@@ -151,19 +130,31 @@ func APIGroupFromDocPackage(pkg *doc.Package) (*APIGroup, error) {
 		Group:   pkgDoc.Annotations[groupNameAnnotation],
 		Version: pkg.Name,
 	}
+	apiGroup.CRs, apiGroup.SubObjects, err = d.loadObjects(ctx, pkg, apiGroup.GroupVersion)
+	if err != nil {
+		return nil, fmt.Errorf("load objects: %w", err)
+	}
 
-	subObjectMap := map[string]struct{}{}
-	subObjects := map[string]CustomResourceSubObject{}
+	return apiGroup, nil
+}
+
+func (d *Docgen) loadObjects(
+	ctx context.Context, pkg *doc.Package, gv schema.GroupVersion,
+) (crs []CustomResource, objs []CustomResourceSubObject, err error) {
 	for _, t := range pkg.Types {
-		typeDoc, err := FormatRawDoc(t.Doc)
+		typeDoc, err := d.formatRawDoc(ctx, t.Doc)
 		if err != nil {
-			return nil, fmt.Errorf(
+			return nil, nil, fmt.Errorf(
 				"formatting type %s documentation: %w", t.Name, err)
 		}
 
-		fields, embedded, err := Fields(t)
+		fields, embeddedTypes, err := d.Fields(ctx, t)
 		if err != nil {
-			return nil, fmt.Errorf("reading fields for CR: %w", err)
+			return nil, nil, fmt.Errorf("reading fields for CR: %w", err)
+		}
+
+		if len(fields) == 0 {
+			continue
 		}
 
 		if typeDoc.Annotations[objectRootAnnotation] == "true" {
@@ -173,81 +164,108 @@ func APIGroupFromDocPackage(pkg *doc.Package) (*APIGroup, error) {
 			}
 
 			cr := CustomResource{
-				GroupVersionKind: apiGroup.WithKind(t.Name),
+				GroupVersionKind: gv.WithKind(t.Name),
 				Doc:              *typeDoc,
 				Fields:           fields,
 			}
-
-			apiGroup.CRs = append(apiGroup.CRs, cr)
+			if typeDoc.Annotations[scopeAnnotation] == "Cluster" {
+				cr.Scope = CustomResourceScopeCluster
+			} else {
+				cr.Scope = CustomResourceScopeNamespaced
+			}
+			crs = append(crs, cr)
 			continue
-		}
-
-		if len(fields) == 0 {
-			continue
-		}
-
-		for _, e := range embedded {
-			subObjectMap[e] = struct{}{}
 		}
 
 		// Some other Type
-		subObjects[t.Name] = CustomResourceSubObject{
+		objs = append(objs, CustomResourceSubObject{
 			Name:               t.Name,
 			Doc:                *typeDoc,
 			Fields:             fields,
-			EmbeddedSubObjects: embedded,
+			EmbeddedSubObjects: embeddedTypes,
+		})
+	}
+	d.loadEmbeddedFields(ctx, objs)
+	d.loadParents(ctx, crs, objs)
+	if err := d.loadExampleYaml(ctx, crs, objs); err != nil {
+		return nil, nil, fmt.Errorf("loading example YAML: %w", err)
+	}
+	return crs, objs, nil
+}
+
+// Load embedded fields from other types.
+func (d *Docgen) loadEmbeddedFields(
+	ctx context.Context,
+	objs []CustomResourceSubObject,
+) {
+	subObjectsByName := map[string]CustomResourceSubObject{}
+	embeddedObjects := map[string]struct{}{}
+	for _, obj := range objs {
+		subObjectsByName[obj.Name] = obj
+		for _, embeddedType := range obj.EmbeddedSubObjects {
+			embeddedObjects[embeddedType] = struct{}{}
 		}
-		apiGroup.SubObjects = append(apiGroup.SubObjects, subObjects[t.Name])
 	}
 
-	// Handle embedded fields and parents.
-	for i, subObject := range apiGroup.SubObjects {
-		if _, ok := subObjectMap[subObject.Name]; ok {
-			apiGroup.SubObjects[i].IsEmbedded = true
+	for i, obj := range objs {
+		if _, ok := subObjectsByName[obj.Name]; ok {
+			objs[i].IsEmbedded = true
 		}
 
-		for _, embedded := range subObject.EmbeddedSubObjects {
-			embeddedObj := subObjects[embedded]
-			apiGroup.SubObjects[i].Fields = append(
-				apiGroup.SubObjects[i].Fields, embeddedObj.Fields...)
+		for _, embedded := range obj.EmbeddedSubObjects {
+			embeddedObj := subObjectsByName[embedded]
+			objs[i].Fields = append(
+				objs[i].Fields, embeddedObj.Fields...)
 		}
 	}
+}
 
-	// Add Parents
+func (d *Docgen) loadParents(
+	ctx context.Context,
+	crds []CustomResource,
+	objs []CustomResourceSubObject,
+) {
 	objectsUsingType := map[string][]string{}
-	for _, subObject := range apiGroup.SubObjects {
+	for _, subObject := range objs {
 		for _, field := range subObject.Fields {
 			k := strings.TrimLeft(field.Type, "[]")
 			objectsUsingType[k] = append(objectsUsingType[k], subObject.Name)
 		}
 	}
-	for _, cr := range apiGroup.CRs {
+	for _, cr := range crds {
 		for _, field := range cr.Fields {
 			k := strings.TrimLeft(field.Type, "[]")
 			objectsUsingType[k] = append(objectsUsingType[k], cr.Kind)
 		}
 	}
-	for i := range apiGroup.SubObjects {
-		apiGroup.SubObjects[i].Parents = objectsUsingType[apiGroup.SubObjects[i].Name]
+	for i := range objs {
+		objs[i].Parents = objectsUsingType[objs[i].Name]
 	}
+}
 
+func (d *Docgen) loadExampleYaml(
+	ctx context.Context,
+	crs []CustomResource,
+	objs []CustomResourceSubObject,
+) error {
 	// Add Examples
-	for i, cr := range apiGroup.CRs {
-		example, err := BuildExampleYaml(&cr, apiGroup.SubObjects)
+	for i, cr := range crs {
+		example, err := d.buildExampleYaml(&cr, objs)
 		if err != nil {
-			return nil, fmt.Errorf("building example for CR %s: %w",
+			return fmt.Errorf("building example for CR %s: %w",
 				cr.GroupVersionKind.String(), err)
 		}
 
-		apiGroup.CRs[i].Example = example
+		crs[i].ExampleYaml = example
 	}
-
-	return apiGroup, nil
+	return nil
 }
 
-func Fields(t *doc.Type) (
+func (d *Docgen) Fields(
+	ctx context.Context, t *doc.Type,
+) (
 	fields []CustomResourceField,
-	embedded []string, err error,
+	embeddedTypes []string, err error,
 ) {
 	structType, ok := t.Decl.Specs[0].(*ast.TypeSpec).Type.(*ast.StructType)
 	if !ok {
@@ -264,7 +282,7 @@ func Fields(t *doc.Type) (
 		}
 		if strings.Contains(jsonTag, "inline") {
 			// embedded object
-			embedded = append(embedded, fieldType)
+			embeddedTypes = append(embeddedTypes, fieldType)
 			continue
 		}
 
@@ -274,7 +292,7 @@ func Fields(t *doc.Type) (
 			continue
 		}
 
-		fieldDoc, err := FormatRawDoc(field.Doc.Text())
+		fieldDoc, err := d.formatRawDoc(ctx, field.Doc.Text())
 		if err != nil {
 			return nil, nil, fmt.Errorf(
 				"formatting field %s documentation: %w", fieldName, err)
@@ -338,7 +356,9 @@ func fieldName(field *ast.Field, jsonTag string) string {
 	return jsonTag
 }
 
-func FormatRawDoc(rawDoc string) (docBlock *DocumentationBlock, err error) {
+func (d *Docgen) formatRawDoc(
+	ctx context.Context, rawDoc string,
+) (docBlock *DocumentationBlock, err error) {
 	buf := bytes.NewBufferString(rawDoc)
 	r := bufio.NewReader(buf)
 
@@ -380,7 +400,7 @@ func FormatRawDoc(rawDoc string) (docBlock *DocumentationBlock, err error) {
 	}, nil
 }
 
-func BuildExampleYaml(
+func (d *Docgen) buildExampleYaml(
 	cr *CustomResource,
 	subObjects []CustomResourceSubObject,
 ) (y string, err error) {

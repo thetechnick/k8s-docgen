@@ -19,11 +19,11 @@
 
 {{.Doc.Sanitized}}
 
-{{if .Example}}
+{{if .ExampleYaml}}
 **Example**
 
 ```yaml
-{{.Example}}
+{{.ExampleYaml}}
 ```
 {{end}}
 
@@ -43,7 +43,6 @@ Used in:
 {{end}}
 {{end}}
 
-
 ## `{{.GroupVersion}}`
 
 {{.Doc.Sanitized}}
@@ -55,6 +54,8 @@ Used in:
 {{range .CRs -}}
 {{template "cr" .}}
 {{end}}
+
+---
 
 {{range .SubObjects -}}
 {{template "subobject" .}}
