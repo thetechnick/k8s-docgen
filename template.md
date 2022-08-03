@@ -1,5 +1,6 @@
 {{define "typelink" -}}
-  {{- if contains "." . -}}
+  {{$simpleTypes := list "string" "int" "int64" "uint64" "[]string" "[]int"}}
+  {{- if or (contains "." .) (has . $simpleTypes) -}}
     {{.}}
   {{- else -}}
     <a href="#{{. | replace "[]" "" | lower}}">{{.}}</a>
@@ -43,7 +44,7 @@ Used in:
 {{end}}
 {{end}}
 
-## `{{.GroupVersion}}`
+## {{.GroupVersion}}
 
 {{.Doc.Sanitized}}
 
