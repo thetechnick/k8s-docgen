@@ -190,7 +190,16 @@ func (d *Docgen) loadObjects(
 	if err := d.loadExampleYaml(ctx, crs, objs); err != nil {
 		return nil, nil, fmt.Errorf("loading example YAML: %w", err)
 	}
-	return crs, objs, nil
+	// filter embedded objects
+	var filteredObjs []CustomResourceSubObject
+	for _, obj := range objs {
+		if obj.IsEmbedded {
+			continue
+		}
+		filteredObjs = append(filteredObjs, obj)
+	}
+	d.defaultFieldDocsToTypeDocs(ctx, crs, filteredObjs)
+	return crs, filteredObjs, nil
 }
 
 // Load embedded fields from other types.
@@ -208,7 +217,7 @@ func (d *Docgen) loadEmbeddedFields(
 	}
 
 	for i, obj := range objs {
-		if _, ok := subObjectsByName[obj.Name]; ok {
+		if _, ok := embeddedObjects[obj.Name]; ok {
 			objs[i].IsEmbedded = true
 		}
 
@@ -227,6 +236,9 @@ func (d *Docgen) loadParents(
 ) {
 	objectsUsingType := map[string][]string{}
 	for _, subObject := range objs {
+		if subObject.IsEmbedded {
+			continue
+		}
 		for _, field := range subObject.Fields {
 			k := strings.TrimLeft(field.Type, "[]")
 			objectsUsingType[k] = append(objectsUsingType[k], subObject.Name)
@@ -259,6 +271,42 @@ func (d *Docgen) loadExampleYaml(
 		crs[i].ExampleYaml = example
 	}
 	return nil
+}
+
+func (d *Docgen) defaultFieldDocsToTypeDocs(
+	ctx context.Context,
+	crs []CustomResource,
+	objs []CustomResourceSubObject,
+) {
+	subObjectsByName := map[string]CustomResourceSubObject{}
+	for _, obj := range objs {
+		subObjectsByName[obj.Name] = obj
+	}
+
+	for crdi, obj := range crs {
+		for fi, field := range obj.Fields {
+			if len(field.Doc.Sanitized) > 0 {
+				continue
+			}
+
+			if fieldTypeObj, ok := subObjectsByName[field.Type]; ok {
+				field.Doc.Sanitized = fieldTypeObj.Doc.Sanitized
+				crs[crdi].Fields[fi].Doc.Sanitized = fieldTypeObj.Doc.Sanitized
+			}
+		}
+	}
+
+	for oi, obj := range objs {
+		for fi, field := range obj.Fields {
+			if len(field.Doc.Sanitized) > 0 {
+				continue
+			}
+
+			if fieldTypeObj, ok := subObjectsByName[field.Type]; ok {
+				objs[oi].Fields[fi].Doc.Sanitized = fieldTypeObj.Doc.Sanitized
+			}
+		}
+	}
 }
 
 func (d *Docgen) Fields(
