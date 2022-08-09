@@ -209,15 +209,22 @@ func (d *Docgen) loadEmbeddedFields(
 ) {
 	subObjectsByName := map[string]CustomResourceSubObject{}
 	embeddedObjects := map[string]struct{}{}
+	fieldObjectTypes := map[string]struct{}{}
 	for _, obj := range objs {
 		subObjectsByName[obj.Name] = obj
 		for _, embeddedType := range obj.EmbeddedSubObjects {
 			embeddedObjects[embeddedType] = struct{}{}
 		}
+		for _, field := range obj.Fields {
+			fieldObjectTypes[field.Type] = struct{}{}
+		}
 	}
 
 	for i, obj := range objs {
-		if _, ok := embeddedObjects[obj.Name]; ok {
+		_, isEmbedded := embeddedObjects[obj.Name]
+		_, isReferencedByField := fieldObjectTypes[obj.Name]
+		if isEmbedded && !isReferencedByField {
+			// Only mark (and later filter) objects that are embedded AND
 			objs[i].IsEmbedded = true
 		}
 
