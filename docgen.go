@@ -490,14 +490,6 @@ func exampleFieldValue(
 	annotations map[string]string,
 	subObjects map[string]CustomResourceSubObject,
 ) interface{} {
-	if strings.HasPrefix(fieldType, "[]") {
-		// array
-		return []interface{}{
-			exampleFieldValue(
-				fieldType[2:], annotations, subObjects),
-		}
-	}
-
 	if example, ok := annotations[exampleAnnotation]; ok {
 		var val interface{}
 		if err := yaml.Unmarshal([]byte(example), &val); err != nil {
@@ -513,12 +505,21 @@ func exampleFieldValue(
 		return val
 	}
 
+	if strings.HasPrefix(fieldType, "[]") {
+		// array
+		return []interface{}{
+			exampleFieldValue(
+				fieldType[2:], annotations, subObjects),
+		}
+	}
+
 	switch fieldType {
 	case "int", "int32", "int64":
 		return 42
 	case "string":
 		return nextWord()
-
+	case "bool":
+		return "true"
 	default:
 		if subObject, ok := subObjects[fieldType]; ok {
 			return exampleObject(subObject.Fields, subObjects)
