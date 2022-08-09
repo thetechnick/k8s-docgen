@@ -216,7 +216,7 @@ func (d *Docgen) loadEmbeddedFields(
 			embeddedObjects[embeddedType] = struct{}{}
 		}
 		for _, field := range obj.Fields {
-			fieldObjectTypes[field.Type] = struct{}{}
+			fieldObjectTypes[strings.TrimPrefix(field.Type, "[]")] = struct{}{}
 		}
 	}
 
