@@ -434,6 +434,28 @@ func (d *Docgen) formatRawDoc(
 		switch {
 		case strings.HasPrefix(line, "TODO:"): // Ignore TODOs
 		case strings.HasPrefix(line, "todo:"): // Ignore TODOs
+		case strings.HasPrefix(line, "+example"):
+			annotations[exampleAnnotation] = strings.Split(line,"=")[1]
+		case strings.HasPrefix(line, "+groupName"):
+			annotations[groupNameAnnotation] = strings.Split(line,"=")[1]
+		case strings.HasPrefix(line, "+optional"):
+			annotations[line] = ""
+		case strings.HasPrefix(line, "+kubebuilder:default"):
+			annotations[defaultAnnotation] = strings.Split(line,"=")[1]
+		case strings.HasPrefix(line, "+kubebuilder:resource"):			
+			line = strings.TrimPrefix(line, "+kubebuilder:resource:")
+			if !strings.Contains(line, "=") {
+				annotations[line] = ""
+			} else if strings.HasPrefix(line, "scope") {
+				parts := strings.SplitN(line, ",", 2)
+				for _, arg := range parts {
+					values := strings.Split(arg, "=")
+					annotations[values[0]] = values[1]
+				}
+			} else {
+				values := strings.Split(line, "=")
+				annotations[values[0]] = values[1]
+			}
 		case strings.HasPrefix(line, "+"): // Code generator annotations
 			parts := strings.SplitN(line, "=", 2)
 			if len(parts) == 1 {
