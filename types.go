@@ -84,7 +84,7 @@ const (
 	// Indicates root of a custom resource.
 	objectRootAnnotation = "kubebuilder:object:root"
 	// Scope of the API. Cluster or Namespace.
-	scopeAnnotation = "kubebuilder:resource:scope"
+	scopeAnnotation = "scope"
 	// Field defaults applied during API server admission.
 	defaultAnnotation = "kubebuilder:default"
 	// Custom example value for this documentation generator.
