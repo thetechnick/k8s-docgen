@@ -435,14 +435,14 @@ func (d *Docgen) formatRawDoc(
 		case strings.HasPrefix(line, "TODO:"): // Ignore TODOs
 		case strings.HasPrefix(line, "todo:"): // Ignore TODOs
 		case strings.HasPrefix(line, "+example"):
-			annotations[exampleAnnotation] = strings.Split(line,"=")[1]
+			annotations[exampleAnnotation] = strings.SplitN(line, "=", 2)[1]
 		case strings.HasPrefix(line, "+groupName"):
-			annotations[groupNameAnnotation] = strings.Split(line,"=")[1]
+			annotations[groupNameAnnotation] = strings.SplitN(line, "=", 2)[1]
 		case strings.HasPrefix(line, "+optional"):
 			annotations[line] = ""
 		case strings.HasPrefix(line, "+kubebuilder:default"):
-			annotations[defaultAnnotation] = strings.Split(line,"=")[1]
-		case strings.HasPrefix(line, "+kubebuilder:resource"):			
+			annotations[defaultAnnotation] = strings.SplitN(line, "=", 2)[1]
+		case strings.HasPrefix(line, "+kubebuilder:resource"):
 			line = strings.TrimPrefix(line, "+kubebuilder:resource:")
 			if !strings.Contains(line, "=") {
 				annotations[line] = ""
