@@ -1,5 +1,5 @@
 {{define "typelink" -}}
-  {{$simpleTypes := list "string" "int" "int64" "uint64" "[]string" "[]int"}}
+  {{$simpleTypes := list "string" "int" "int64" "uint64" "[]string" "[]int" "bool"}}
   {{- if or (contains "." .) (has . $simpleTypes) -}}
     {{.}}
   {{- else -}}
