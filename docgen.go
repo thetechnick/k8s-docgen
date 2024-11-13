@@ -548,7 +548,7 @@ func exampleFieldValue(
 	case "string":
 		return nextWord()
 	case "bool":
-		return "true"
+		return true
 	default:
 		if subObject, ok := subObjects[fieldType]; ok {
 			return exampleObject(subObject.Fields, subObjects)
