@@ -1,6 +1,9 @@
 package testdata
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
 
 // +kubebuilder:object:root=true
 type TestObject struct {
@@ -14,7 +17,8 @@ type TestObjectSpec struct {
 	Objects []Object `json:"objects"`
 	Object  `json:",inline"`
 	// +example={field1: apps/v1, field2: false}
-	ExampleObj Object `json:"exampleObj"`
+	ExampleObj Object    `json:"exampleObj"`
+	UID        types.UID `json:"uid"`
 }
 
 type Object struct {
