@@ -10,7 +10,6 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -66,7 +65,7 @@ func (d *Docgen) Parse(ctx context.Context, folder string, writer io.Writer) err
 
 	t := template.New("doc").Funcs(sprig.TxtFuncMap())
 	if d.opts.TemplateFile != "" {
-		c, err := ioutil.ReadFile(d.opts.TemplateFile)
+		c, err := os.ReadFile(d.opts.TemplateFile)
 		if err != nil {
 			return fmt.Errorf("reading template file: %w", err)
 		}
@@ -99,7 +98,7 @@ func (d *Docgen) parseGoPackage(ctx context.Context, folder string) (*doc.Packag
 		return nil, fmt.Errorf("read directory: %w", err)
 	}
 	for _, entry := range entries {
-		if entry.IsDir() {
+		if entry.IsDir() || path.Ext(entry.Name()) != ".go" {
 			continue
 		}
 
@@ -125,7 +124,7 @@ func (d *Docgen) loadAPIGroup(ctx context.Context, pkg *doc.Package) (*APIGroup,
 	if err != nil {
 		return nil, fmt.Errorf("formatting package documentation: %w", err)
 	}
-	apiGroup.Doc = *pkgDoc
+	apiGroup.Doc = pkgDoc
 	apiGroup.GroupVersion = schema.GroupVersion{
 		Group:   pkgDoc.Annotations[groupNameAnnotation],
 		Version: pkg.Name,
@@ -165,7 +164,7 @@ func (d *Docgen) loadObjects(
 
 			cr := CustomResource{
 				GroupVersionKind: gv.WithKind(t.Name),
-				Doc:              *typeDoc,
+				Doc:              typeDoc,
 				Fields:           fields,
 			}
 			if typeDoc.Annotations[scopeAnnotation] == "Cluster" {
@@ -180,7 +179,7 @@ func (d *Docgen) loadObjects(
 		// Some other Type
 		objs = append(objs, CustomResourceSubObject{
 			Name:               t.Name,
-			Doc:                *typeDoc,
+			Doc:                typeDoc,
 			Fields:             fields,
 			EmbeddedSubObjects: embeddedTypes,
 		})
@@ -355,7 +354,7 @@ func (d *Docgen) Fields(
 
 		fields = append(fields, CustomResourceField{
 			Name:       fieldName,
-			Doc:        *fieldDoc,
+			Doc:        fieldDoc,
 			Type:       fieldType,
 			IsRequired: !strings.Contains(jsonTag, "omitempty"),
 		})
@@ -413,7 +412,7 @@ func fieldName(field *ast.Field, jsonTag string) string {
 
 func (d *Docgen) formatRawDoc(
 	ctx context.Context, rawDoc string,
-) (docBlock *DocumentationBlock, err error) {
+) (docBlock DocumentationBlock, err error) {
 	buf := bytes.NewBufferString(rawDoc)
 	r := bufio.NewReader(buf)
 
@@ -427,7 +426,7 @@ func (d *Docgen) formatRawDoc(
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("reading line: %w", err)
+			return DocumentationBlock{}, fmt.Errorf("reading line: %w", err)
 		}
 		line = strings.TrimSpace(line)
 
@@ -470,7 +469,7 @@ func (d *Docgen) formatRawDoc(
 		}
 	}
 
-	return &DocumentationBlock{
+	return DocumentationBlock{
 		Raw:         rawDoc,
 		Sanitized:   strings.TrimSpace(out.String()),
 		Annotations: annotations,
@@ -553,7 +552,7 @@ func exampleFieldValue(
 		if subObject, ok := subObjects[fieldType]; ok {
 			return exampleObject(subObject.Fields, subObjects)
 		}
-		return fieldType
+		return map[string]interface{}{}
 	}
 }
 
