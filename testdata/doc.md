@@ -51,6 +51,7 @@ spec:
     field4: 42
     field5: 42
     field6: 42
+  uid: 3490a790-05f8-4bd7-8333-1001c49fccd2
 
 ```
 
@@ -96,6 +97,7 @@ Used in:
 | `object` <b>required</b><br><a href="#object">Object</a> |  |
 | `objects` <b>required</b><br><a href="#object">[]Object</a> |  |
 | `exampleObj` <b>required</b><br><a href="#object">Object</a> |  |
+| `uid` <b>required</b><br>types.UID |  |
 | `field1` <b>required</b><br>string |  |
 | `field2` <br>bool |  |
 | `field3` <b>required</b><br>[]string |  |

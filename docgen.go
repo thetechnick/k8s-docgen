@@ -548,6 +548,8 @@ func exampleFieldValue(
 		return nextWord()
 	case "bool":
 		return true
+	case "types.UID":
+		return "3490a790-05f8-4bd7-8333-1001c49fccd2"
 	default:
 		if subObject, ok := subObjects[fieldType]; ok {
 			return exampleObject(subObject.Fields, subObjects)
